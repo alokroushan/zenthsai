@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, User, Image, Eye, EyeOff } from 'lucide-react';
-import { Navbar } from '@/components/layout/Navbar';
+import { useNavigate, Link } from 'react-router-dom';
+import { Loader2, User, Image, Eye, EyeOff, Edit3, Trash2, Plus } from 'lucide-react';
+import { MainLayout } from '@/components/layout/MainLayout';
 import { PostCard } from '@/components/posts/PostCard';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -48,6 +58,7 @@ export default function ProfilePage() {
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('public');
+  const [deletePostId, setDeletePostId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -98,7 +109,10 @@ export default function ProfilePage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPosts((data || []).map(post => ({ ...post, profiles: profile ? { username: profile.username, avatar_url: profile.avatar_url } : null })));
+      setPosts((data || []).map(post => ({
+        ...post,
+        profiles: profile ? { username: profile.username, avatar_url: profile.avatar_url } : null
+      })));
     } catch (error) {
       console.error('Error fetching posts:', error);
     } finally {
@@ -111,7 +125,6 @@ export default function ProfilePage() {
       const { data, error } = await supabase
         .from('votes')
         .select('post_id, vote_type, user_id');
-
       if (error) throw error;
       setVotes(data || []);
     } catch (error) {
@@ -139,28 +152,15 @@ export default function ProfilePage() {
 
   const handleVote = async (postId: string, voteType: number) => {
     if (!user) return;
-
     const existingVote = userVotes[postId];
 
     try {
       if (existingVote === voteType) {
-        await supabase
-          .from('votes')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
+        await supabase.from('votes').delete().eq('post_id', postId).eq('user_id', user.id);
       } else if (existingVote) {
-        await supabase
-          .from('votes')
-          .update({ vote_type: voteType })
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
+        await supabase.from('votes').update({ vote_type: voteType }).eq('post_id', postId).eq('user_id', user.id);
       } else {
-        await supabase.from('votes').insert({
-          post_id: postId,
-          user_id: user.id,
-          vote_type: voteType,
-        });
+        await supabase.from('votes').insert({ post_id: postId, user_id: user.id, vote_type: voteType });
       }
       fetchVotes();
     } catch (error) {
@@ -173,125 +173,188 @@ export default function ProfilePage() {
     fetchPosts();
   };
 
-  const getPostVotes = (postId: string) => {
-    return votes.filter((v) => v.post_id === postId);
+  const handleDeletePost = async () => {
+    if (!deletePostId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', deletePostId)
+        .eq('user_id', user!.id);
+
+      if (error) throw error;
+      toast.success('Post deleted');
+      fetchPosts();
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast.error('Failed to delete post');
+    } finally {
+      setDeletePostId(null);
+    }
   };
+
+  const getPostVotes = (postId: string) => votes.filter((v) => v.post_id === postId);
 
   const publicPosts = posts.filter(p => p.is_public);
   const privatePosts = posts.filter(p => !p.is_public);
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
+      <MainLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* Profile Header */}
-          <div className="glass-card p-8 mb-6 animate-fade-in">
-            <div className="flex items-center gap-6">
-              <Avatar className="w-24 h-24 border-4 border-primary/30">
-                <AvatarFallback className="text-3xl bg-secondary">
-                  {profile?.username?.charAt(0).toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <h1 className="text-2xl font-bold mb-1">
-                  {profile?.username || 'Loading...'}
-                </h1>
-                <p className="text-muted-foreground mb-4">
-                  {user.email}
-                </p>
-                <div className="flex items-center gap-6 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Image className="w-4 h-4 text-primary" />
-                    <span>{posts.length} posts</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-primary" />
-                    <span>{publicPosts.length} public</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <EyeOff className="w-4 h-4 text-muted-foreground" />
-                    <span>{privatePosts.length} private</span>
-                  </div>
+    <MainLayout>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Profile Header */}
+        <div className="glass-card p-8 mb-6 animate-fade-in">
+          <div className="flex items-center gap-6">
+            <Avatar className="w-24 h-24 border-4 border-primary/30">
+              <AvatarFallback className="text-3xl bg-secondary">
+                {profile?.username?.charAt(0).toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold mb-1">
+                {profile?.username || 'Loading...'}
+              </h1>
+              <p className="text-muted-foreground mb-4">{user.email}</p>
+              <div className="flex items-center gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <Image className="w-4 h-4 text-primary" />
+                  <span>{posts.length} posts</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-primary" />
+                  <span>{publicPosts.length} public</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <EyeOff className="w-4 h-4 text-muted-foreground" />
+                  <span>{privatePosts.length} private</span>
                 </div>
               </div>
             </div>
+            <Button asChild className="gap-2">
+              <Link to="/create">
+                <Plus className="w-4 h-4" />
+                Create New
+              </Link>
+            </Button>
           </div>
-
-          {/* Posts Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="glass-card w-full mb-6">
-              <TabsTrigger value="public" className="flex-1 gap-2">
-                <Eye className="w-4 h-4" />
-                Public ({publicPosts.length})
-              </TabsTrigger>
-              <TabsTrigger value="private" className="flex-1 gap-2">
-                <EyeOff className="w-4 h-4" />
-                Private ({privatePosts.length})
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="public" className="space-y-4">
-              {isLoading ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
-              ) : publicPosts.length === 0 ? (
-                <div className="text-center py-12 glass-card">
-                  <Image className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No public posts yet</p>
-                </div>
-              ) : (
-                publicPosts.map((post) => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    votes={getPostVotes(post.id)}
-                    userVote={userVotes[post.id]}
-                    commentCount={commentCounts[post.id] || 0}
-                    onVote={handleVote}
-                    onVisibilityChange={handleVisibilityChange}
-                  />
-                ))
-              )}
-            </TabsContent>
-
-            <TabsContent value="private" className="space-y-4">
-              {isLoading ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
-              ) : privatePosts.length === 0 ? (
-                <div className="text-center py-12 glass-card">
-                  <EyeOff className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No private posts yet</p>
-                </div>
-              ) : (
-                privatePosts.map((post) => (
-                  <PostCard
-                    key={post.id}
-                    post={post}
-                    votes={getPostVotes(post.id)}
-                    userVote={userVotes[post.id]}
-                    commentCount={commentCounts[post.id] || 0}
-                    onVote={handleVote}
-                    onVisibilityChange={handleVisibilityChange}
-                  />
-                ))
-              )}
-            </TabsContent>
-          </Tabs>
         </div>
-      </main>
-    </div>
+
+        {/* Posts Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="glass-card w-full mb-6">
+            <TabsTrigger value="public" className="flex-1 gap-2">
+              <Eye className="w-4 h-4" />
+              Public ({publicPosts.length})
+            </TabsTrigger>
+            <TabsTrigger value="private" className="flex-1 gap-2">
+              <EyeOff className="w-4 h-4" />
+              Private ({privatePosts.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="public" className="space-y-4">
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : publicPosts.length === 0 ? (
+              <div className="text-center py-12 glass-card">
+                <Image className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No public posts yet</p>
+              </div>
+            ) : (
+              publicPosts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  votes={getPostVotes(post.id)}
+                  userVote={userVotes[post.id]}
+                  commentCount={commentCounts[post.id] || 0}
+                  onVote={handleVote}
+                  onVisibilityChange={handleVisibilityChange}
+                />
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="private" className="space-y-4">
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : privatePosts.length === 0 ? (
+              <div className="text-center py-12 glass-card">
+                <EyeOff className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No private posts yet</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Private posts are only visible to you
+                </p>
+              </div>
+            ) : (
+              privatePosts.map((post) => (
+                <div key={post.id} className="relative group">
+                  <PostCard
+                    post={post}
+                    votes={getPostVotes(post.id)}
+                    userVote={userVotes[post.id]}
+                    commentCount={commentCounts[post.id] || 0}
+                    onVote={handleVote}
+                    onVisibilityChange={handleVisibilityChange}
+                  />
+                  {/* Edit/Delete overlay for private posts */}
+                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => navigate(`/create?edit=${post.id}`)}
+                      className="gap-1"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setDeletePostId(post.id)}
+                      className="gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletePostId} onOpenChange={() => setDeletePostId(null)}>
+        <AlertDialogContent className="glass-card">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The post and all its comments will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePost} className="bg-destructive text-destructive-foreground">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </MainLayout>
   );
 }

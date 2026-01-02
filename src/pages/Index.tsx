@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, Sparkles, TrendingUp, Clock, Flame, Star } from 'lucide-react';
-import { Navbar } from '@/components/layout/Navbar';
+import { MainLayout } from '@/components/layout/MainLayout';
 import { PostCard } from '@/components/posts/PostCard';
+import { TrendingCarousel } from '@/components/posts/TrendingCarousel';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,11 +35,14 @@ interface Vote {
 
 export default function Index() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState<Post[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [userVotes, setUserVotes] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<{ post_id: string }[]>([]);
-  const [sortType, setSortType] = useState<SortType>('hot');
+  const [sortType, setSortType] = useState<SortType>(
+    (searchParams.get('sort') as SortType) || 'hot'
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -47,29 +52,17 @@ export default function Index() {
 
     const postsChannel = supabase
       .channel('posts-feed')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'posts' },
-        () => fetchPosts()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => fetchPosts())
       .subscribe();
 
     const votesChannel = supabase
       .channel('votes-feed')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'votes' },
-        () => fetchVotes()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => fetchVotes())
       .subscribe();
 
     const commentsChannel = supabase
       .channel('comments-feed')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'comments' },
-        () => fetchComments()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => fetchComments())
       .subscribe();
 
     return () => {
@@ -128,7 +121,6 @@ export default function Index() {
       const { data, error } = await supabase
         .from('votes')
         .select('post_id, vote_type, user_id');
-
       if (error) throw error;
       setVotes(data || []);
     } catch (error) {
@@ -141,7 +133,6 @@ export default function Index() {
       const { data, error } = await supabase
         .from('comments')
         .select('post_id');
-
       if (error) throw error;
       setComments(data || []);
     } catch (error) {
@@ -159,23 +150,11 @@ export default function Index() {
 
     try {
       if (existingVote === voteType) {
-        await supabase
-          .from('votes')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
+        await supabase.from('votes').delete().eq('post_id', postId).eq('user_id', user.id);
       } else if (existingVote) {
-        await supabase
-          .from('votes')
-          .update({ vote_type: voteType })
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
+        await supabase.from('votes').update({ vote_type: voteType }).eq('post_id', postId).eq('user_id', user.id);
       } else {
-        await supabase.from('votes').insert({
-          post_id: postId,
-          user_id: user.id,
-          vote_type: voteType,
-        });
+        await supabase.from('votes').insert({ post_id: postId, user_id: user.id, vote_type: voteType });
       }
     } catch (error) {
       console.error('Error voting:', error);
@@ -183,19 +162,23 @@ export default function Index() {
     }
   };
 
-  // Use the advanced feed algorithm
+  const handleSortChange = (sort: SortType) => {
+    setSortType(sort);
+    setSearchParams(sort === 'hot' ? {} : { sort });
+  };
+
   const sortedPosts = useMemo(() => {
     let ranked = sortPosts(posts, votes, comments, sortType);
-    
-    // Apply personalization for logged-in users on "hot" sort
     if (user && sortType === 'hot') {
       ranked = getPersonalizedPosts(ranked, votes, user.id);
     }
-    
     return ranked;
   }, [posts, votes, comments, sortType, user]);
 
-  // Build comment counts map
+  const trendingPosts = useMemo(() => {
+    return sortPosts(posts, votes, comments, 'top').slice(0, 8);
+  }, [posts, votes, comments]);
+
   const commentCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     comments.forEach((c) => {
@@ -204,101 +187,50 @@ export default function Index() {
     return counts;
   }, [comments]);
 
-  const getPostVotes = (postId: string) => {
-    return votes.filter((v) => v.post_id === postId);
-  };
+  const getPostVotes = (postId: string) => votes.filter((v) => v.post_id === postId);
 
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      
-      {/* Hero Section */}
-      <div className="relative overflow-hidden border-b border-border/50" style={{ background: 'var(--gradient-hero)' }}>
-        <div className="container mx-auto px-4 py-16">
-          <div className="max-w-2xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6 animate-fade-in">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">Powered by Google Gemini</span>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 animate-slide-up">
-              Where <span className="gradient-text">AI Art</span> Comes Alive
-            </h1>
-            <p className="text-lg text-muted-foreground animate-slide-up" style={{ animationDelay: '0.1s' }}>
-              Generate stunning images with Gemini AI. Share, vote, and discover the best AI creations from our community.
-            </p>
-          </div>
-        </div>
-        
-        <div className="absolute top-1/2 left-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute top-1/4 right-10 w-48 h-48 bg-orange-500/5 rounded-full blur-3xl" />
-      </div>
+    <MainLayout>
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Trending Carousel */}
+        {trendingPosts.length > 0 && (
+          <TrendingCarousel posts={trendingPosts} />
+        )}
 
-      {/* Sort Tabs with new "Best" option */}
-      <div className="sticky top-16 z-40 glass-card border-t-0 rounded-none">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center gap-2 py-3 overflow-x-auto">
+        {/* Sort Tabs */}
+        <div className="flex items-center gap-2 py-4 mb-4 border-b border-border/50">
+          <span className="text-sm text-muted-foreground mr-2">Sort by:</span>
+          {[
+            { type: 'hot' as const, icon: Flame, label: 'Hot' },
+            { type: 'best' as const, icon: Star, label: 'Best' },
+            { type: 'new' as const, icon: Clock, label: 'New' },
+            { type: 'top' as const, icon: TrendingUp, label: 'Top' },
+          ].map(({ type, icon: Icon, label }) => (
             <Button
+              key={type}
               variant="ghost"
               size="sm"
-              onClick={() => setSortType('hot')}
+              onClick={() => handleSortChange(type)}
               className={cn(
-                'gap-2 shrink-0',
-                sortType === 'hot' && 'bg-primary/10 text-primary'
+                'gap-2',
+                sortType === type && 'bg-primary/10 text-primary'
               )}
             >
-              <Flame className="w-4 h-4" />
-              Hot
+              <Icon className="w-4 h-4" />
+              {label}
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSortType('best')}
-              className={cn(
-                'gap-2 shrink-0',
-                sortType === 'best' && 'bg-primary/10 text-primary'
-              )}
-            >
-              <Star className="w-4 h-4" />
-              Best
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSortType('new')}
-              className={cn(
-                'gap-2 shrink-0',
-                sortType === 'new' && 'bg-primary/10 text-primary'
-              )}
-            >
-              <Clock className="w-4 h-4" />
-              New
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSortType('top')}
-              className={cn(
-                'gap-2 shrink-0',
-                sortType === 'top' && 'bg-primary/10 text-primary'
-              )}
-            >
-              <TrendingUp className="w-4 h-4" />
-              Top
-            </Button>
-          </div>
+          ))}
         </div>
-      </div>
 
-      {/* Feed */}
-      <main className="container mx-auto px-4 py-6">
-        <div className="max-w-2xl mx-auto space-y-4">
+        {/* Feed */}
+        <div className="space-y-4">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
               <p className="text-muted-foreground">Loading amazing creations...</p>
             </div>
           ) : posts.length === 0 ? (
-            <div className="text-center py-20">
+            <div className="text-center py-20 glass-card">
               <Sparkles className="w-12 h-12 mx-auto text-primary/50 mb-4" />
               <h2 className="text-xl font-semibold mb-2">No posts yet</h2>
               <p className="text-muted-foreground mb-6">
@@ -318,7 +250,7 @@ export default function Index() {
             ))
           )}
         </div>
-      </main>
-    </div>
+      </div>
+    </MainLayout>
   );
 }
