@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt } = await req.json();
+    const { prompt, sourceImage, mode = "generate" } = await req.json();
 
     if (!prompt || typeof prompt !== "string") {
       return new Response(
@@ -20,14 +20,54 @@ serve(async (req) => {
       );
     }
 
-    console.log("Generating image with Gemini for prompt:", prompt);
+    console.log(`Mode: ${mode}, Prompt: ${prompt.substring(0, 50)}...`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Using Gemini's latest image generation model
+    let messages;
+
+    if (mode === "edit" && sourceImage) {
+      // Image-to-image editing mode
+      console.log("Using image-to-image mode");
+      messages = [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Edit this image based on the following instruction: "${prompt}". 
+              
+Apply the changes while maintaining the core composition and quality. Make it visually stunning.`,
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: sourceImage,
+              },
+            },
+          ],
+        },
+      ];
+    } else {
+      // Text-to-image generation mode
+      console.log("Using text-to-image mode");
+      messages = [
+        {
+          role: "user",
+          content: `Create a stunning, high-quality artistic image based on this description: "${prompt}". 
+          
+Make it visually impressive with:
+- Rich colors and excellent composition
+- Professional artistic quality
+- Creative interpretation of the prompt
+- High detail and clarity`,
+        },
+      ];
+    }
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -36,18 +76,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-3-pro-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: `Create a stunning, high-quality artistic image based on this description: "${prompt}". 
-            
-Make it visually impressive with:
-- Rich colors and excellent composition
-- Professional artistic quality
-- Creative interpretation of the prompt
-- High detail and clarity`,
-          },
-        ],
+        messages,
         modalities: ["image", "text"],
       }),
     });
@@ -87,7 +116,8 @@ Make it visually impressive with:
       JSON.stringify({ 
         imageUrl,
         description: textContent,
-        model: "gemini-3-pro-image"
+        model: "gemini-3-pro-image",
+        mode
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
