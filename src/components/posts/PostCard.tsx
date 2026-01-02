@@ -170,13 +170,6 @@ export function PostCard({ post, votes, userVote, commentCount, onVote, onVisibi
             </div>
           </Link>
 
-          {/* Prompt preview */}
-          <div className="px-4 pb-2">
-            <p className="text-sm text-muted-foreground line-clamp-2 italic">
-              "{post.prompt}"
-            </p>
-          </div>
-
           {/* Footer */}
           <div className="px-4 pb-4 flex items-center gap-4">
             <Link
