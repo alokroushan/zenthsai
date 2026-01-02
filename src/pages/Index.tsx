@@ -190,7 +190,7 @@ export default function Index() {
   const getPostVotes = (postId: string) => votes.filter((v) => v.post_id === postId);
 
   return (
-    <MainLayout>
+    <MainLayout showRightSidebar>
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Trending Carousel */}
         {trendingPosts.length > 0 && (
