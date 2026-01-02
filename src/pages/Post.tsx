@@ -30,29 +30,37 @@ interface Vote {
   user_id: string;
 }
 
+interface VoteCount {
+  upvotes: number;
+  downvotes: number;
+  total_score: number;
+}
+
 export default function PostPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   
   const [post, setPost] = useState<Post | null>(null);
-  const [votes, setVotes] = useState<Vote[]>([]);
+  const [voteCount, setVoteCount] = useState<VoteCount>({ upvotes: 0, downvotes: 0, total_score: 0 });
   const [userVote, setUserVote] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (id) {
       fetchPost();
-      fetchVotes();
+      fetchVoteCount();
     }
   }, [id]);
 
+  // Fetch user's own vote when user changes
   useEffect(() => {
-    if (user && votes.length > 0) {
-      const myVote = votes.find(v => v.user_id === user.id);
-      setUserVote(myVote?.vote_type || null);
+    if (user && id) {
+      fetchUserVote();
+    } else {
+      setUserVote(null);
     }
-  }, [votes, user]);
+  }, [user, id]);
 
   const fetchPost = async () => {
     try {
@@ -86,17 +94,43 @@ export default function PostPage() {
     }
   };
 
-  const fetchVotes = async () => {
+  // Fetch aggregated vote count for this post
+  const fetchVoteCount = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('post_vote_counts')
+        .select('upvotes, downvotes, total_score')
+        .eq('post_id', id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
+      if (data) {
+        setVoteCount({
+          upvotes: Number(data.upvotes) || 0,
+          downvotes: Number(data.downvotes) || 0,
+          total_score: Number(data.total_score) || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching vote count:', error);
+    }
+  };
+
+  // Fetch user's own vote (RLS enforced - only sees own vote)
+  const fetchUserVote = async () => {
+    if (!user) return;
     try {
       const { data, error } = await supabase
         .from('votes')
-        .select('vote_type, user_id')
-        .eq('post_id', id);
+        .select('vote_type')
+        .eq('post_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
 
       if (error) throw error;
-      setVotes(data || []);
+      setUserVote(data?.vote_type || null);
     } catch (error) {
-      console.error('Error fetching votes:', error);
+      console.error('Error fetching user vote:', error);
     }
   };
 
@@ -110,15 +144,31 @@ export default function PostPage() {
       if (userVote === voteType) {
         await supabase.from('votes').delete().eq('post_id', id).eq('user_id', user.id);
         setUserVote(null);
-        setVotes(votes.filter(v => v.user_id !== user.id));
+        setVoteCount(prev => ({
+          ...prev,
+          upvotes: voteType === 1 ? prev.upvotes - 1 : prev.upvotes,
+          downvotes: voteType === -1 ? prev.downvotes - 1 : prev.downvotes,
+          total_score: prev.total_score - voteType
+        }));
       } else if (userVote) {
         await supabase.from('votes').update({ vote_type: voteType }).eq('post_id', id).eq('user_id', user.id);
         setUserVote(voteType);
-        setVotes(votes.map(v => v.user_id === user.id ? { ...v, vote_type: voteType } : v));
+        // Switching from upvote to downvote or vice versa
+        setVoteCount(prev => ({
+          ...prev,
+          upvotes: voteType === 1 ? prev.upvotes + 1 : prev.upvotes - 1,
+          downvotes: voteType === -1 ? prev.downvotes + 1 : prev.downvotes - 1,
+          total_score: prev.total_score + (voteType * 2) // +2 or -2 for switching
+        }));
       } else {
         await supabase.from('votes').insert({ post_id: id, user_id: user.id, vote_type: voteType });
         setUserVote(voteType);
-        setVotes([...votes, { user_id: user.id, vote_type: voteType }]);
+        setVoteCount(prev => ({
+          ...prev,
+          upvotes: voteType === 1 ? prev.upvotes + 1 : prev.upvotes,
+          downvotes: voteType === -1 ? prev.downvotes + 1 : prev.downvotes,
+          total_score: prev.total_score + voteType
+        }));
       }
     } catch (error) {
       console.error('Error voting:', error);
@@ -126,7 +176,7 @@ export default function PostPage() {
     }
   };
 
-  const totalVotes = votes.reduce((sum, v) => sum + v.vote_type, 0);
+  const totalVotes = voteCount.total_score;
 
   if (isLoading) {
     return (

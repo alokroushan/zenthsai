@@ -30,18 +30,18 @@ interface PostCardProps {
       avatar_url?: string;
     };
   };
-  votes: { vote_type: number }[];
+  voteCount: { upvotes: number; downvotes: number; total: number };
   userVote?: number;
   commentCount: number;
   onVote: (postId: string, voteType: number) => void;
   onVisibilityChange?: (postId: string, isPublic: boolean) => void;
 }
 
-export function PostCard({ post, votes, userVote, commentCount, onVote, onVisibilityChange }: PostCardProps) {
+export function PostCard({ post, voteCount, userVote, commentCount, onVote, onVisibilityChange }: PostCardProps) {
   const { user } = useAuth();
   const [isChangingVisibility, setIsChangingVisibility] = useState(false);
 
-  const totalVotes = votes.reduce((sum, v) => sum + v.vote_type, 0);
+  const totalVotes = voteCount.total;
   const isOwner = user?.id === post.user_id;
 
   const handleVisibilityToggle = async () => {
