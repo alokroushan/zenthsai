@@ -156,7 +156,23 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      post_vote_counts: {
+        Row: {
+          downvotes: number | null
+          post_id: string | null
+          total_score: number | null
+          upvotes: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       [_ in never]: never
