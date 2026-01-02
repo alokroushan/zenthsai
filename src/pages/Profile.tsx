@@ -40,6 +40,13 @@ interface Vote {
   user_id: string;
 }
 
+interface VoteCount {
+  post_id: string;
+  upvotes: number;
+  downvotes: number;
+  total_score: number;
+}
+
 interface Profile {
   username: string;
   avatar_url?: string;
@@ -53,7 +60,8 @@ export default function ProfilePage() {
   
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [votes, setVotes] = useState<Vote[]>([]);
+  const [votes, setVotes] = useState<Vote[]>([]); // User's own votes only
+  const [voteCounts, setVoteCounts] = useState<VoteCount[]>([]); // Aggregated counts
   const [userVotes, setUserVotes] = useState<Record<string, number>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -70,20 +78,20 @@ export default function ProfilePage() {
     if (user) {
       fetchProfile();
       fetchPosts();
-      fetchVotes();
+      fetchUserVotes();
+      fetchVoteCounts();
       fetchCommentCounts();
     }
   }, [user]);
 
+  // Derive userVotes map from votes array
   useEffect(() => {
-    if (user && votes.length > 0) {
-      const userVoteMap: Record<string, number> = {};
-      votes.filter(v => v.user_id === user.id).forEach(v => {
-        userVoteMap[v.post_id] = v.vote_type;
-      });
-      setUserVotes(userVoteMap);
-    }
-  }, [votes, user]);
+    const userVoteMap: Record<string, number> = {};
+    votes.forEach(v => {
+      userVoteMap[v.post_id] = v.vote_type;
+    });
+    setUserVotes(userVoteMap);
+  }, [votes]);
 
   const fetchProfile = async () => {
     try {
@@ -120,7 +128,9 @@ export default function ProfilePage() {
     }
   };
 
-  const fetchVotes = async () => {
+  // Fetch only the current user's votes (RLS enforced)
+  const fetchUserVotes = async () => {
+    if (!user) return;
     try {
       const { data, error } = await supabase
         .from('votes')
@@ -128,7 +138,20 @@ export default function ProfilePage() {
       if (error) throw error;
       setVotes(data || []);
     } catch (error) {
-      console.error('Error fetching votes:', error);
+      console.error('Error fetching user votes:', error);
+    }
+  };
+
+  // Fetch aggregated vote counts (public, no user_id exposed)
+  const fetchVoteCounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('post_vote_counts')
+        .select('post_id, upvotes, downvotes, total_score');
+      if (error) throw error;
+      setVoteCounts(data || []);
+    } catch (error) {
+      console.error('Error fetching vote counts:', error);
     }
   };
 
@@ -162,7 +185,8 @@ export default function ProfilePage() {
       } else {
         await supabase.from('votes').insert({ post_id: postId, user_id: user.id, vote_type: voteType });
       }
-      fetchVotes();
+      fetchUserVotes();
+      fetchVoteCounts();
     } catch (error) {
       console.error('Error voting:', error);
       toast.error('Failed to vote');
@@ -194,7 +218,10 @@ export default function ProfilePage() {
     }
   };
 
-  const getPostVotes = (postId: string) => votes.filter((v) => v.post_id === postId);
+  const getPostVoteCount = (postId: string) => {
+    const vc = voteCounts.find(v => v.post_id === postId);
+    return vc ? { upvotes: Number(vc.upvotes), downvotes: Number(vc.downvotes), total: Number(vc.total_score) } : { upvotes: 0, downvotes: 0, total: 0 };
+  };
 
   const publicPosts = posts.filter(p => p.is_public);
   const privatePosts = posts.filter(p => !p.is_public);
@@ -277,7 +304,7 @@ export default function ProfilePage() {
                 <PostCard
                   key={post.id}
                   post={post}
-                  votes={getPostVotes(post.id)}
+                  voteCount={getPostVoteCount(post.id)}
                   userVote={userVotes[post.id]}
                   commentCount={commentCounts[post.id] || 0}
                   onVote={handleVote}
@@ -305,7 +332,7 @@ export default function ProfilePage() {
                 <div key={post.id} className="relative group">
                   <PostCard
                     post={post}
-                    votes={getPostVotes(post.id)}
+                    voteCount={getPostVoteCount(post.id)}
                     userVote={userVotes[post.id]}
                     commentCount={commentCounts[post.id] || 0}
                     onVote={handleVote}

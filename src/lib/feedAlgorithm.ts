@@ -42,6 +42,13 @@ interface VoteData {
   user_id: string;
 }
 
+interface VoteCountData {
+  post_id: string;
+  upvotes: number;
+  downvotes: number;
+  total_score: number;
+}
+
 interface CommentData {
   post_id: string;
 }
@@ -104,26 +111,22 @@ export function calculateWilsonScore(
   return (left - right) / under;
 }
 
-// Main sorting function
+// Main sorting function - now uses aggregated vote counts
 export function sortPosts(
   posts: PostData[],
-  votes: VoteData[],
+  voteCounts: VoteCountData[],
   comments: CommentData[],
   sortType: 'hot' | 'new' | 'top' | 'best'
 ): ScoredPost[] {
-  // Build vote and comment counts per post
+  // Build vote counts map
   const votesByPost: Record<string, { up: number; down: number }> = {};
   const commentsByPost: Record<string, number> = {};
   
-  votes.forEach((vote) => {
-    if (!votesByPost[vote.post_id]) {
-      votesByPost[vote.post_id] = { up: 0, down: 0 };
-    }
-    if (vote.vote_type === 1) {
-      votesByPost[vote.post_id].up++;
-    } else if (vote.vote_type === -1) {
-      votesByPost[vote.post_id].down++;
-    }
+  voteCounts.forEach((vc) => {
+    votesByPost[vc.post_id] = { 
+      up: Number(vc.upvotes) || 0, 
+      down: Number(vc.downvotes) || 0 
+    };
   });
   
   comments.forEach((comment) => {

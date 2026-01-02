@@ -33,11 +33,19 @@ interface Vote {
   user_id: string;
 }
 
+interface VoteCount {
+  post_id: string;
+  upvotes: number;
+  downvotes: number;
+  total_score: number;
+}
+
 export default function Index() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState<Post[]>([]);
-  const [votes, setVotes] = useState<Vote[]>([]);
+  const [votes, setVotes] = useState<Vote[]>([]); // User's own votes only
+  const [voteCounts, setVoteCounts] = useState<VoteCount[]>([]); // Aggregated counts
   const [userVotes, setUserVotes] = useState<Record<string, number>>({});
   const [comments, setComments] = useState<{ post_id: string }[]>([]);
   const [sortType, setSortType] = useState<SortType>(
@@ -47,7 +55,7 @@ export default function Index() {
 
   useEffect(() => {
     fetchPosts();
-    fetchVotes();
+    fetchVoteCounts();
     fetchComments();
 
     const postsChannel = supabase
@@ -57,7 +65,10 @@ export default function Index() {
 
     const votesChannel = supabase
       .channel('votes-feed')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => fetchVotes())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => {
+        fetchVoteCounts();
+        if (user) fetchUserVotes();
+      })
       .subscribe();
 
     const commentsChannel = supabase
@@ -72,17 +83,24 @@ export default function Index() {
     };
   }, []);
 
+  // Fetch user's own votes when user changes
   useEffect(() => {
     if (user) {
-      const userVoteMap: Record<string, number> = {};
-      votes.filter(v => v.user_id === user.id).forEach(v => {
-        userVoteMap[v.post_id] = v.vote_type;
-      });
-      setUserVotes(userVoteMap);
+      fetchUserVotes();
     } else {
+      setVotes([]);
       setUserVotes({});
     }
-  }, [votes, user]);
+  }, [user]);
+
+  // Derive userVotes map from votes array
+  useEffect(() => {
+    const userVoteMap: Record<string, number> = {};
+    votes.forEach(v => {
+      userVoteMap[v.post_id] = v.vote_type;
+    });
+    setUserVotes(userVoteMap);
+  }, [votes]);
 
   const fetchPosts = async () => {
     try {
@@ -116,7 +134,22 @@ export default function Index() {
     }
   };
 
-  const fetchVotes = async () => {
+  // Fetch aggregated vote counts (public, no user_id exposed)
+  const fetchVoteCounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('post_vote_counts')
+        .select('post_id, upvotes, downvotes, total_score');
+      if (error) throw error;
+      setVoteCounts(data || []);
+    } catch (error) {
+      console.error('Error fetching vote counts:', error);
+    }
+  };
+
+  // Fetch only the current user's votes (RLS enforced)
+  const fetchUserVotes = async () => {
+    if (!user) return;
     try {
       const { data, error } = await supabase
         .from('votes')
@@ -124,7 +157,7 @@ export default function Index() {
       if (error) throw error;
       setVotes(data || []);
     } catch (error) {
-      console.error('Error fetching votes:', error);
+      console.error('Error fetching user votes:', error);
     }
   };
 
@@ -168,16 +201,16 @@ export default function Index() {
   };
 
   const sortedPosts = useMemo(() => {
-    let ranked = sortPosts(posts, votes, comments, sortType);
+    let ranked = sortPosts(posts, voteCounts, comments, sortType);
     if (user && sortType === 'hot') {
       ranked = getPersonalizedPosts(ranked, votes, user.id);
     }
     return ranked;
-  }, [posts, votes, comments, sortType, user]);
+  }, [posts, voteCounts, comments, sortType, user, votes]);
 
   const trendingPosts = useMemo(() => {
-    return sortPosts(posts, votes, comments, 'top').slice(0, 8);
-  }, [posts, votes, comments]);
+    return sortPosts(posts, voteCounts, comments, 'top').slice(0, 8);
+  }, [posts, voteCounts, comments]);
 
   const commentCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -187,7 +220,10 @@ export default function Index() {
     return counts;
   }, [comments]);
 
-  const getPostVotes = (postId: string) => votes.filter((v) => v.post_id === postId);
+  const getPostVoteCount = (postId: string) => {
+    const vc = voteCounts.find(v => v.post_id === postId);
+    return vc ? { upvotes: Number(vc.upvotes), downvotes: Number(vc.downvotes), total: Number(vc.total_score) } : { upvotes: 0, downvotes: 0, total: 0 };
+  };
 
   return (
     <MainLayout showRightSidebar>
@@ -242,7 +278,7 @@ export default function Index() {
               <PostCard
                 key={post.id}
                 post={post}
-                votes={getPostVotes(post.id)}
+                voteCount={getPostVoteCount(post.id)}
                 userVote={userVotes[post.id]}
                 commentCount={commentCounts[post.id] || 0}
                 onVote={handleVote}
