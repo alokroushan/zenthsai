@@ -205,10 +205,13 @@ export default function PostPage() {
                 <img src={post.image_url} alt={post.title} className="w-full h-auto" />
               </div>
 
-              <div className="p-4 rounded-xl bg-secondary/30 mb-6">
-                <p className="text-sm text-muted-foreground mb-1">Prompt used:</p>
-                <p className="italic">"{post.prompt}"</p>
-              </div>
+              {/* Only show prompt to the post owner */}
+              {user?.id === post.user_id && (
+                <div className="p-4 rounded-xl bg-secondary/30 mb-6">
+                  <p className="text-sm text-muted-foreground mb-1">Your prompt:</p>
+                  <p className="italic">"{post.prompt}"</p>
+                </div>
+              )}
 
               <CommentSection postId={post.id} />
             </div>
