@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
-import { Sparkles, LogOut, User, Plus } from 'lucide-react';
+import { Sparkles, LogOut, User, Plus, Search, MessageCircleQuestion } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,38 +16,74 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 export function Navbar() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
   return (
     <nav className="sticky top-0 z-50 glass-card border-b border-border/50">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center glow-effect transition-transform group-hover:scale-105">
+        <div className="flex items-center justify-between h-14 gap-4">
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2 group shrink-0">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center transition-transform group-hover:scale-105">
               <Sparkles className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold gradient-text">ArtifAI</span>
+            <span className="text-xl font-bold gradient-text hidden sm:block">ArtifAI</span>
           </Link>
 
-          <div className="flex items-center gap-3">
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="flex-1 max-w-xl">
+            <div className="relative flex items-center">
+              <div className="absolute left-3 text-muted-foreground">
+                <Search className="w-4 h-4" />
+              </div>
+              <Input
+                type="text"
+                placeholder="Find anything"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-20 h-10 rounded-full bg-secondary/50 border-border/50 focus:border-primary/50 text-sm"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 h-8 px-3 rounded-full text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
+              >
+                <MessageCircleQuestion className="w-4 h-4" />
+                <span className="hidden sm:inline">Ask</span>
+              </Button>
+            </div>
+          </form>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 shrink-0">
             {user ? (
               <>
                 <Button
                   onClick={() => navigate('/create')}
-                  className="bg-gradient-to-r from-primary to-orange-400 hover:opacity-90 transition-opacity gap-2"
+                  size="sm"
+                  className="bg-gradient-to-r from-primary to-orange-400 hover:opacity-90 transition-opacity gap-1.5 rounded-full"
                 >
                   <Plus className="w-4 h-4" />
-                  Create
+                  <span className="hidden sm:inline">Create</span>
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                      <Avatar className="h-10 w-10 border-2 border-primary/30">
-                        <AvatarFallback className="bg-secondary text-foreground">
+                    <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
+                      <Avatar className="h-9 w-9 border-2 border-primary/30">
+                        <AvatarFallback className="bg-secondary text-foreground text-sm">
                           {user.email?.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -70,14 +108,15 @@ export function Navbar() {
               </>
             ) : (
               <>
-                <Button variant="ghost" onClick={() => navigate('/auth')}>
-                  Sign In
+                <Button variant="ghost" size="sm" onClick={() => navigate('/auth')} className="rounded-full">
+                  Log In
                 </Button>
                 <Button
+                  size="sm"
                   onClick={() => navigate('/auth?mode=signup')}
-                  className="bg-gradient-to-r from-primary to-orange-400 hover:opacity-90 transition-opacity"
+                  className="bg-gradient-to-r from-primary to-orange-400 hover:opacity-90 transition-opacity rounded-full"
                 >
-                  Join Now
+                  Sign Up
                 </Button>
               </>
             )}

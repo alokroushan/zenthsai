@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowBigUp, ArrowBigDown, MessageCircle, Eye, EyeOff, MoreHorizontal } from 'lucide-react';
+import { ArrowBigUp, ArrowBigDown, MessageCircle, Share, Eye, EyeOff, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -65,122 +65,148 @@ export function PostCard({ post, votes, userVote, commentCount, onVote, onVisibi
     }
   };
 
+  const handleShare = async () => {
+    const url = `${window.location.origin}/post/${post.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Link copied to clipboard');
+    } catch {
+      toast.error('Failed to copy link');
+    }
+  };
+
+  const formatVotes = (count: number) => {
+    if (count >= 1000) {
+      return (count / 1000).toFixed(1) + 'K';
+    }
+    return count.toString();
+  };
+
   return (
     <article className="glass-card overflow-hidden animate-fade-in hover:border-primary/30 transition-all duration-300 group">
-      <div className="flex">
-        {/* Vote Column */}
-        <div className="flex flex-col items-center gap-1 p-3 bg-secondary/30">
+      {/* Header */}
+      <div className="p-3 pb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Avatar className="w-6 h-6">
+            <AvatarFallback className="text-xs bg-secondary">
+              {post.profiles?.username?.charAt(0).toUpperCase() || 'U'}
+            </AvatarFallback>
+          </Avatar>
+          <span className="font-medium text-foreground">
+            u/{post.profiles?.username || 'anonymous'}
+          </span>
+          <span>•</span>
+          <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+          {!post.is_public && (
+            <Badge variant="outline" className="text-xs">
+              <EyeOff className="w-3 h-3 mr-1" />
+              Private
+            </Badge>
+          )}
+        </div>
+        
+        {isOwner && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="glass-card">
+              <DropdownMenuItem
+                onClick={handleVisibilityToggle}
+                disabled={isChangingVisibility}
+                className="cursor-pointer"
+              >
+                {post.is_public ? (
+                  <>
+                    <EyeOff className="w-4 h-4 mr-2" />
+                    Make Private
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Make Public
+                  </>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+
+      {/* Title */}
+      <Link to={`/post/${post.id}`} className="block px-3">
+        <h2 className="text-lg font-semibold hover:text-primary transition-colors line-clamp-2">
+          {post.title}
+        </h2>
+      </Link>
+
+      {/* Image */}
+      <Link to={`/post/${post.id}`} className="block p-3">
+        <div className="relative overflow-hidden rounded-lg aspect-video bg-secondary/50">
+          <img
+            src={post.image_url}
+            alt={post.title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+          />
+        </div>
+      </Link>
+
+      {/* Pill Action Bar */}
+      <div className="px-3 pb-3 flex items-center gap-2">
+        {/* Vote Pill */}
+        <div className="flex items-center bg-secondary/80 rounded-full">
           <button
             onClick={() => user && onVote(post.id, 1)}
             className={cn(
-              'vote-button',
-              userVote === 1 ? 'vote-up-active' : 'vote-up'
+              'p-2 rounded-l-full transition-colors',
+              userVote === 1 
+                ? 'text-[hsl(var(--upvote))]' 
+                : 'text-muted-foreground hover:text-[hsl(var(--upvote))] hover:bg-secondary'
             )}
             disabled={!user}
           >
-            <ArrowBigUp className="w-6 h-6" />
+            <ArrowBigUp className="w-5 h-5" />
           </button>
           <span className={cn(
-            'text-sm font-bold',
-            totalVotes > 0 ? 'text-upvote' : totalVotes < 0 ? 'text-downvote' : 'text-muted-foreground'
+            'text-sm font-bold min-w-[2rem] text-center',
+            totalVotes > 0 ? 'text-[hsl(var(--upvote))]' : totalVotes < 0 ? 'text-[hsl(var(--downvote))]' : 'text-muted-foreground'
           )}>
-            {totalVotes}
+            {formatVotes(totalVotes)}
           </span>
           <button
             onClick={() => user && onVote(post.id, -1)}
             className={cn(
-              'vote-button',
-              userVote === -1 ? 'vote-down-active' : 'vote-down'
+              'p-2 rounded-r-full transition-colors',
+              userVote === -1 
+                ? 'text-[hsl(var(--downvote))]' 
+                : 'text-muted-foreground hover:text-[hsl(var(--downvote))] hover:bg-secondary'
             )}
             disabled={!user}
           >
-            <ArrowBigDown className="w-6 h-6" />
+            <ArrowBigDown className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="p-4 pb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Avatar className="w-6 h-6">
-                <AvatarFallback className="text-xs bg-secondary">
-                  {post.profiles?.username?.charAt(0).toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <span className="font-medium text-foreground">
-                {post.profiles?.username || 'anonymous'}
-              </span>
-              <span>•</span>
-              <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
-              {!post.is_public && (
-                <Badge variant="outline" className="text-xs">
-                  <EyeOff className="w-3 h-3 mr-1" />
-                  Private
-                </Badge>
-              )}
-            </div>
-            
-            {isOwner && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="glass-card">
-                  <DropdownMenuItem
-                    onClick={handleVisibilityToggle}
-                    disabled={isChangingVisibility}
-                    className="cursor-pointer"
-                  >
-                    {post.is_public ? (
-                      <>
-                        <EyeOff className="w-4 h-4 mr-2" />
-                        Make Private
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="w-4 h-4 mr-2" />
-                        Make Public
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+        {/* Comments Pill */}
+        <Link
+          to={`/post/${post.id}`}
+          className="flex items-center gap-1.5 px-3 py-2 bg-secondary/80 rounded-full text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+        >
+          <MessageCircle className="w-4 h-4" />
+          <span>{commentCount}</span>
+        </Link>
 
-          {/* Title */}
-          <Link to={`/post/${post.id}`} className="block px-4">
-            <h2 className="text-lg font-semibold hover:text-primary transition-colors line-clamp-2">
-              {post.title}
-            </h2>
-          </Link>
-
-          {/* Image */}
-          <Link to={`/post/${post.id}`} className="block p-4">
-            <div className="relative overflow-hidden rounded-lg aspect-video bg-secondary/50">
-              <img
-                src={post.image_url}
-                alt={post.title}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                loading="lazy"
-              />
-            </div>
-          </Link>
-
-          {/* Footer */}
-          <div className="px-4 pb-4 flex items-center gap-4">
-            <Link
-              to={`/post/${post.id}`}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <MessageCircle className="w-4 h-4" />
-              {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
-            </Link>
-          </div>
-        </div>
+        {/* Share Pill */}
+        <button
+          onClick={handleShare}
+          className="flex items-center gap-1.5 px-3 py-2 bg-secondary/80 rounded-full text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+        >
+          <Share className="w-4 h-4" />
+          <span>Share</span>
+        </button>
       </div>
     </article>
   );
