@@ -54,7 +54,7 @@ export function RightSidebar() {
           <Link to="/terms" className="hover:underline">User Agreement</Link>
           <Link to="/accessibility" className="hover:underline">Accessibility</Link>
         </div>
-        <p className="pt-1">ArtifAI, Inc. © 2026. All rights reserved.</p>
+        <p className="pt-1">Zenth, Inc. © 2026. All rights reserved.</p>
       </div>
     </aside>
   );

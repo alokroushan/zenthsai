@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Loader2, User, Image, Eye, EyeOff, Edit3, Trash2, Plus } from 'lucide-react';
+import { Loader2, User, Image, Eye, EyeOff, Edit3, Trash2, Plus, Camera } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PostCard } from '@/components/posts/PostCard';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertDialog,
@@ -57,14 +57,16 @@ interface Profile {
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [votes, setVotes] = useState<Vote[]>([]); // User's own votes only
-  const [voteCounts, setVoteCounts] = useState<VoteCount[]>([]); // Aggregated counts
+  const [votes, setVotes] = useState<Vote[]>([]);
+  const [voteCounts, setVoteCounts] = useState<VoteCount[]>([]);
   const [userVotes, setUserVotes] = useState<Record<string, number>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [activeTab, setActiveTab] = useState('public');
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
 
@@ -84,7 +86,6 @@ export default function ProfilePage() {
     }
   }, [user]);
 
-  // Derive userVotes map from votes array
   useEffect(() => {
     const userVoteMap: Record<string, number> = {};
     votes.forEach(v => {
@@ -128,7 +129,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Fetch only the current user's votes (RLS enforced)
   const fetchUserVotes = async () => {
     if (!user) return;
     try {
@@ -142,7 +142,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Fetch aggregated vote counts (public, no user_id exposed)
   const fetchVoteCounts = async () => {
     try {
       const { data, error } = await supabase
@@ -170,6 +169,67 @@ export default function ProfilePage() {
       setCommentCounts(counts);
     } catch (error) {
       console.error('Error fetching comment counts:', error);
+    }
+  };
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be less than 2MB');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      // Create unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/avatar.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Add cache buster to URL
+      const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      // Update profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      // Refresh profile
+      setProfile(prev => prev ? { ...prev, avatar_url: avatarUrl } : null);
+      toast.success('Profile photo updated!');
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Failed to upload profile photo');
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -242,11 +302,36 @@ export default function ProfilePage() {
         {/* Profile Header */}
         <div className="glass-card p-8 mb-6 animate-fade-in">
           <div className="flex items-center gap-6">
-            <Avatar className="w-24 h-24 border-4 border-primary/30">
-              <AvatarFallback className="text-3xl bg-secondary">
-                {profile?.username?.charAt(0).toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
+            {/* Avatar with upload option */}
+            <div className="relative group">
+              <Avatar className="w-24 h-24 border-4 border-primary/30">
+                {profile?.avatar_url ? (
+                  <AvatarImage src={profile.avatar_url} alt={profile.username} />
+                ) : null}
+                <AvatarFallback className="text-3xl bg-secondary">
+                  {profile?.username?.charAt(0).toUpperCase() || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <button
+                onClick={handleAvatarClick}
+                disabled={isUploadingAvatar}
+                className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              >
+                {isUploadingAvatar ? (
+                  <Loader2 className="w-6 h-6 text-white animate-spin" />
+                ) : (
+                  <Camera className="w-6 h-6 text-white" />
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </div>
+            
             <div className="flex-1">
               <h1 className="text-2xl font-bold mb-1">
                 {profile?.username || 'Loading...'}
@@ -338,7 +423,6 @@ export default function ProfilePage() {
                     onVote={handleVote}
                     onVisibilityChange={handleVisibilityChange}
                   />
-                  {/* Edit/Delete overlay for private posts */}
                   <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       size="sm"
