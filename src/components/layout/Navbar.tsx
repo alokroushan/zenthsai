@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
-import { Sparkles, LogOut, User, Plus, Search, MessageCircleQuestion } from 'lucide-react';
+import { LogOut, User, Plus, Search, MessageCircleQuestion } from 'lucide-react';
+import zenthLogo from '@/assets/zenth-logo.png';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,10 +37,8 @@ export function Navbar() {
         <div className="flex items-center justify-between h-14 gap-4">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group shrink-0">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center transition-transform group-hover:scale-105">
-              <Sparkles className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold gradient-text hidden sm:block">ArtifAI</span>
+            <img src={zenthLogo} alt="Zenth" className="w-9 h-9 rounded-lg transition-transform group-hover:scale-105" />
+            <span className="text-xl font-bold gradient-text hidden sm:block">Zenth</span>
           </Link>
 
           {/* Search Bar */}
