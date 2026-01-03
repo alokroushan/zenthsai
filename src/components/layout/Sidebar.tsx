@@ -12,7 +12,7 @@ const mainNavItems = [
 ];
 
 const resourceItems = [
-  { icon: Info, label: 'About ArtifAI', path: '/about' },
+  { icon: Info, label: 'About Zenth', path: '/about' },
   { icon: Book, label: 'Guidelines', path: '/guidelines' },
   { icon: Code, label: 'API', path: '/api' },
   { icon: Newspaper, label: 'Blog', path: '/blog' },
@@ -124,7 +124,7 @@ export function Sidebar() {
             <Link to="/privacy" className="hover:underline">Privacy</Link>
             <Link to="/content-policy" className="hover:underline">Content Policy</Link>
           </div>
-          <p className="pt-1">© 2026 ArtifAI</p>
+          <p className="pt-1">© 2026 Zenth</p>
         </div>
       </div>
     </aside>
