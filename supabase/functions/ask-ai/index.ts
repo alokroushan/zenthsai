@@ -44,7 +44,7 @@ You help users with:
 Be friendly, concise, and helpful. When discussing art creation, provide actionable tips.
 Keep responses brief but informative (2-4 sentences for simple queries, more for complex ones).`;
 
-    const response = await fetch("https://api.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -56,7 +56,6 @@ Keep responses brief but informative (2-4 sentences for simple queries, more for
           { role: "system", content: systemPrompt },
           { role: "user", content: query }
         ],
-        max_tokens: 500,
       }),
     });
 
