@@ -91,16 +91,18 @@ export default function Auth() {
   };
 
   return (
-    <div className="flex flex-col items-center mb-8">
-  <img
-    src="/zenth-logo.png"
-    alt="Zenth logo"
-    className="w-16 h-16 rounded-2xl mb-4"
-  />
-  <h1 className="text-2xl font-bold gradient-text">Zenth</h1>
-  <p className="text-muted-foreground mt-2">
-    {isSignUp ? 'Create your account' : 'Welcome back'}
-  </p>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--gradient-hero)' }}>
+<div className="w-full max-w-md">
+<div className="glass-card p-8 animate-scale-in">
+{/* Logo */}
+<div className="flex flex-col items-center mb-8">
+<div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center glow-effect mb-4">
+<Sparkles className="w-8 h-8 text-primary-foreground" />
+</div>
+<h1 className="text-2xl font-bold gradient-text">Zenth</h1>
+<p className="text-muted-foreground mt-2">
+{isSignUp ? 'Create your account' : 'Welcome back'}
+</p>
 </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
