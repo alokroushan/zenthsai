@@ -99,7 +99,7 @@ export default function Auth() {
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center glow-effect mb-4">
               <Sparkles className="w-8 h-8 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl font-bold gradient-text">ArtifAI</h1>
+            <h1 className="text-2xl font-bold gradient-text">Zenth</h1>
             <p className="text-muted-foreground mt-2">
               {isSignUp ? 'Create your account' : 'Welcome back'}
             </p>
