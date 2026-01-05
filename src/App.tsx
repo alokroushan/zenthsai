@@ -20,6 +20,8 @@ import Privacy from "./pages/Privacy";
 import ContentPolicy from "./pages/ContentPolicy";
 import Rules from "./pages/Rules";
 import Accessibility from "./pages/Accessibility";
+import Chat from "./pages/Chat";
+import Shorts from "./pages/Shorts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +50,8 @@ const App = () => (
             <Route path="/content-policy" element={<ContentPolicy />} />
             <Route path="/rules" element={<Rules />} />
             <Route path="/accessibility" element={<Accessibility />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/shorts" element={<Shorts />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
