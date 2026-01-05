@@ -54,6 +54,7 @@ export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
   
   const styleFilter = searchParams.get('style');
+  const searchQuery = searchParams.get('search');
 
   useEffect(() => {
     fetchPosts();
@@ -205,10 +206,20 @@ export default function Index() {
   const sortedPosts = useMemo(() => {
     let filtered = posts;
     
+    // Apply search filter if present
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = posts.filter(post => 
+        post.prompt.toLowerCase().includes(query) ||
+        post.title.toLowerCase().includes(query) ||
+        post.profiles?.username?.toLowerCase().includes(query)
+      );
+    }
+    
     // Apply style filter if present
     if (styleFilter) {
       const styleKeyword = styleFilter.replace('-', ' ').toLowerCase();
-      filtered = posts.filter(post => 
+      filtered = filtered.filter(post => 
         post.prompt.toLowerCase().includes(styleKeyword) ||
         post.title.toLowerCase().includes(styleKeyword)
       );
@@ -219,7 +230,7 @@ export default function Index() {
       ranked = getPersonalizedPosts(ranked, votes, user.id);
     }
     return ranked;
-  }, [posts, voteCounts, comments, sortType, user, votes, styleFilter]);
+  }, [posts, voteCounts, comments, sortType, user, votes, styleFilter, searchQuery]);
 
   const trendingPosts = useMemo(() => {
     return sortPosts(posts, voteCounts, comments, 'top').slice(0, 8);
@@ -246,12 +257,17 @@ export default function Index() {
           <TrendingCarousel posts={trendingPosts} />
         )}
 
-        {/* Style Filter Badge */}
-        {styleFilter && (
+        {/* Search/Style Filter Badge */}
+        {(searchQuery || styleFilter) && (
           <div className="flex items-center gap-2 py-3 px-4 glass-card mb-4">
-            <span className="text-sm text-muted-foreground">Filtering by:</span>
-            <span className="text-sm font-medium text-primary capitalize">
-              {styleFilter.replace('-', ' ')}
+            <span className="text-sm text-muted-foreground">
+              {searchQuery ? 'Search results for:' : 'Filtering by:'}
+            </span>
+            <span className="text-sm font-medium text-primary">
+              {searchQuery ? `"${searchQuery}"` : styleFilter?.replace('-', ' ')}
+            </span>
+            <span className="text-sm text-muted-foreground ml-2">
+              ({sortedPosts.length} {sortedPosts.length === 1 ? 'result' : 'results'})
             </span>
             <Button
               variant="ghost"
@@ -259,7 +275,7 @@ export default function Index() {
               className="ml-auto h-7 text-xs"
               onClick={() => setSearchParams({})}
             >
-              Clear filter
+              Clear
             </Button>
           </div>
         )}
