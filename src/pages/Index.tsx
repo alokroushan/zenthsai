@@ -52,6 +52,8 @@ export default function Index() {
     (searchParams.get('sort') as SortType) || 'hot'
   );
   const [isLoading, setIsLoading] = useState(true);
+  
+  const styleFilter = searchParams.get('style');
 
   useEffect(() => {
     fetchPosts();
@@ -201,12 +203,23 @@ export default function Index() {
   };
 
   const sortedPosts = useMemo(() => {
-    let ranked = sortPosts(posts, voteCounts, comments, sortType);
+    let filtered = posts;
+    
+    // Apply style filter if present
+    if (styleFilter) {
+      const styleKeyword = styleFilter.replace('-', ' ').toLowerCase();
+      filtered = posts.filter(post => 
+        post.prompt.toLowerCase().includes(styleKeyword) ||
+        post.title.toLowerCase().includes(styleKeyword)
+      );
+    }
+    
+    let ranked = sortPosts(filtered, voteCounts, comments, sortType);
     if (user && sortType === 'hot') {
       ranked = getPersonalizedPosts(ranked, votes, user.id);
     }
     return ranked;
-  }, [posts, voteCounts, comments, sortType, user, votes]);
+  }, [posts, voteCounts, comments, sortType, user, votes, styleFilter]);
 
   const trendingPosts = useMemo(() => {
     return sortPosts(posts, voteCounts, comments, 'top').slice(0, 8);
@@ -231,6 +244,24 @@ export default function Index() {
         {/* Trending Carousel */}
         {trendingPosts.length > 0 && (
           <TrendingCarousel posts={trendingPosts} />
+        )}
+
+        {/* Style Filter Badge */}
+        {styleFilter && (
+          <div className="flex items-center gap-2 py-3 px-4 glass-card mb-4">
+            <span className="text-sm text-muted-foreground">Filtering by:</span>
+            <span className="text-sm font-medium text-primary capitalize">
+              {styleFilter.replace('-', ' ')}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-7 text-xs"
+              onClick={() => setSearchParams({})}
+            >
+              Clear filter
+            </Button>
+          </div>
         )}
 
         {/* Sort Tabs */}
