@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Compass, User, Sparkles, TrendingUp, Info, HelpCircle, ChevronUp, Newspaper, Book, Code } from 'lucide-react';
+import { Home, Compass, User, Sparkles, TrendingUp, Info, HelpCircle, ChevronUp, Newspaper, Book, Code, MessageCircle, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -9,6 +9,8 @@ const mainNavItems = [
   { icon: Home, label: 'Home', path: '/' },
   { icon: TrendingUp, label: 'Popular', path: '/?sort=top' },
   { icon: Compass, label: 'Explore', path: '/explore' },
+  { icon: Play, label: 'Shorts', path: '/shorts' },
+  { icon: MessageCircle, label: 'Chat', path: '/chat' },
 ];
 
 const resourceItems = [
